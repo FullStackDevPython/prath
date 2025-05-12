@@ -1,0 +1,69 @@
+import pandas as pd
+import json
+
+def read_tables_from_excel(path):
+    df = pd.read_excel(path, header=None)
+
+    tables = []
+    current_table = []
+    for _, row in df.iterrows():
+        # If entire row is empty, treat it as a separator
+        if row.isnull().all():
+            if current_table:
+                tables.append(pd.DataFrame(current_table).dropna(how='all', axis=1))
+                current_table = []
+        else:
+            current_table.append(row.tolist())
+
+    # Add the last table if exists
+    if current_table:
+        tables.append(pd.DataFrame(current_table).dropna(how='all', axis=1))
+
+    return tables
+
+def convert_table_to_json(table, index):
+    header = table.iloc[0]
+    data = table.iloc[1:]
+    table.columns = header
+    table = table[1:].reset_index(drop=True)
+
+    header_rows = [[
+        {
+            "label": str(col).upper(),
+            "field": str(col).lower().replace(" ","_"),
+            "colSpan": 1,
+            "rowSpan": 1,
+            "style": {}
+        } for col in table.columns
+    ]]
+
+    rows = [
+      
+    ]
+    for _, row in table.iterrows():
+        cells = [{
+            "type": "text",
+            "value": str(val),
+            "colSpan": 1,
+            "rowSpan": 1,
+            "style": {}
+        } for val in row]
+        rows.append({"cells": cells})
+
+    return {
+        "tableName": f"table_{index+1}",
+        "headerRrows": header_rows,
+        "rows": rows
+    }
+
+def excel_to_json(path):
+    tables = read_tables_from_excel(path)
+    result = {
+        "version": "1",
+        "tables": [convert_table_to_json(table, i) for i, table in enumerate(tables)]
+    }
+    return result
+
+path = "input excel path"
+json_output = excel_to_json(path)
+print(json.dumps(json_output, indent=4))
